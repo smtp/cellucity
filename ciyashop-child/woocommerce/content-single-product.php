@@ -53,7 +53,16 @@ $product_page_breadcrumb_position = isset( $ciyashop_options['product-page-bread
 			</div>
 		</div><!-- .product-top-left -->
 		<div class="<?php ciyashop_product_top_right_classes( 'product-top-right' ); ?>">
-			<div class="product-top-right-inner">
+            <ul class="nav nav-tabs nav-fill">
+                <li class="active nav-item">
+                    <a data-toggle="tab" class="nav-link" href="#tab1">Summary</a>
+                </li>
+                <li class="nav-item">
+                    <a data-toggle="tab" class="nav-link"  href="#tab2">More Deals</a>
+                </li>
+            </ul>
+
+            <div id="tab1" class="tab-pane active product-top-right-inner">
 				<?php
 				if ( 'before_product_title' === $product_page_breadcrumb_position ) {
 					?>
@@ -80,7 +89,22 @@ $product_page_breadcrumb_position = isset( $ciyashop_options['product-page-bread
 					do_action( 'woocommerce_single_product_summary' );
 					?>
 				</div>
+			</div>
+            <div id="tab2" class="tab-pane fade in product-top-right-inner">
 
+                Deals go here
+				<?php
+				if ( 'before_product_title' === $product_page_breadcrumb_position ) {
+					?>
+					<div class="cs-product-breadcrumb">
+					<?php echo ciyashop_breadcrumbs(); // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotE ?>
+					</div>
+					<?php
+				}
+				?>
+				<div class="summary entry-summary">
+                    <?php display_related_deals(); ?>
+				</div>
 			</div>
 		</div><!-- .product-top-right -->
 	</div><!-- .product-content-top -->

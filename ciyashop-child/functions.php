@@ -549,14 +549,14 @@ function custom_product_data_tabs($product_data_tabs)
     $product_data_tabs['custom_deal'] = array(
         'label' => __('Deals', 'woocommerce'),
         'target' => 'custom_deal_options',
-        'priority' => 100,
+        'priority' => 2,
+        'icon' => 'dashicons-cart'
     );
     return $product_data_tabs;
 }
 
 add_filter('woocommerce_product_data_tabs', 'custom_product_data_tabs');
 
-// Add the custom field to the custom tab
 function custom_product_data_fields()
 {
     global $woocommerce, $post;
@@ -567,18 +567,16 @@ function custom_product_data_fields()
     $upsell_ids = get_post_meta($post->ID, '_custom_deal_ids', true);
     $upsell_ids = is_array($upsell_ids) ? array_map('absint', $upsell_ids) : array();
 
-    echo '<div class="options_group">';
-
-    // Add category filter
-    $category_id = get_term_by('slug', 'speakers', 'product_cat')->term_id;
-
+    // Set the $args array to limit search to the 'deals' category
     $args = array(
-        'category' => $category_id,
+        'category' => 'deals',
     );
+
+    echo '<div class="options_group">';
 
     echo '<p class="form-field"><label for="_custom_deal_ids">' . __('Deal Search', 'woocommerce') . '</label>';
 
-    // Add $args to search function call
+    // Pass the $args array to the search function call
     echo '<select class="wc-product-search" multiple="multiple" style="width: 50%;" id="_custom_deal_ids" name="_custom_deal_ids[]" data-placeholder="' . esc_attr__('Search for deals&hellip;', 'woocommerce') . '" data-action="woocommerce_json_search_products_and_variations" data-args="' . esc_attr(wp_json_encode($args)) . '"></select>';
 
     echo '</p>';
@@ -625,5 +623,154 @@ function add_deals_admin_menu_item()
 
     );
 }
-
 add_action('admin_menu', 'add_deals_admin_menu_item');
+
+// Define a function to display related deals
+function display_related_deals() {
+    // Get the current post ID
+    $current_post_id = get_the_ID();
+
+    // Get the value of the 'sku' custom field on the current post
+    $current_sku = get_post_meta( $current_post_id, '_sku', true );
+
+    // Get the IDs of all child posts of the current post
+    $child_post_ids = array();
+    $child_posts = get_children( array(
+        'post_parent' => $current_post_id,
+        'post_type' => 'product_variation',
+        'fields' => 'ids',
+    ) );
+    var_dump($current_post_id, $current_sku, $child_posts);
+    if ( $child_posts ) {
+        $child_post_ids = $child_posts;
+    }
+
+    // Create an array to store all related post IDs
+    $related_post_ids = array( $current_post_id );
+
+    // Add the IDs of all child posts to the related post IDs array
+    $related_post_ids = array_merge( $related_post_ids, $child_post_ids );
+
+    // Set up the WP_Query to get other posts with the same 'deal_sku' value
+    $args = array(
+        'post_type' => 'product',
+        'meta_key' => '_deal_sku',
+        'meta_value' => $current_sku,
+        'post__not_in' => $related_post_ids,
+    );
+
+    $related_deals = new WP_Query( $args );
+
+    // Create an array to store all related deals
+    $all_related_deals = array();
+
+    // Check if there are any related deals
+    if ( $related_deals->have_posts() ) {
+        while ( $related_deals->have_posts() ) {
+            $related_deals->the_post();
+            $all_related_deals[] = get_the_ID();
+        }
+        wp_reset_postdata();
+    }
+
+    // Check if there are any child posts and retrieve related deals for each child post
+    if ( $child_post_ids ) {
+        foreach ( $child_post_ids as $child_post_id ) {
+            $child_sku = get_post_meta( $child_post_id, '_sku', true );
+            $child_related_post_ids = array_merge( array( $child_post_id ), $related_post_ids );
+            $child_args = array(
+                'post_type' => 'product',
+                'meta_key' => '_deal_sku',
+                'meta_value' => $child_sku,
+                'post__not_in' => $child_related_post_ids,
+            );
+            $child_related_deals = new WP_Query( $child_args );
+            if ( $child_related_deals->have_posts() ) {
+                while ( $child_related_deals->have_posts() ) {
+                    $child_related_deals->the_post();
+                    $all_related_deals[] = get_the_ID();
+                }
+                wp_reset_postdata();
+            }
+        }
+    }
+
+    // Remove duplicate post IDs from the array
+    $all_related_deals = array_unique( $all_related_deals );
+
+    // Loop through all related deals
+    if ( ! empty( $all_related_deals ) ) {
+        echo '<h2>Related Deals</h2>';
+        echo '<ul>';
+        foreach ( $all_related_deals as $related_deal_id ) {
+            if ($package_id = get_post_meta($related_deal_id, '_package_id', true)) {
+                $related_deal_url = get_permalink( $related_deal_id );
+                echo '<li><a href="' . esc_url( $related_deal_url ) . '">' . check_deal_title($package_id) . '</a></li>';
+            }
+        }
+        echo '</ul>';
+    }
+}
+// Add the function as an action to display it in the post content
+add_action( 'the_content', 'display_related_deals' );
+
+function check_deal_title($value) {
+    $titles = [
+        'UCH' => 'Red Flexi 130',
+        'UCI' => 'Red Flexi 185',
+        'UCJ' => 'Red Flexi 245',
+        'RD5' => 'RED 600MB 50min',
+        'RU5' => 'RED 600MB 50min Top Up',
+        'RD2' => 'RED 1,2GB 100min',
+        'RU2' => 'RED 1,2GB 100min Top Up',
+        'RD3' => 'RED 1,2GB 200min',
+        'RU3' => 'RED 1,2GB 200min Top Up',
+        'RD4' => 'RED 2,4GB 200min',
+        'RDU' => 'RED 3,6GB 100min',
+        'RU4' => 'RED 2,4GB 200min Top Up',
+        'RUU' => 'RED 3,6GB 100min Top Up',
+        'RD9' => 'RED VIP 20GB Unlimited',
+        'RDX' => 'RED VIP 40GB Unlimited',
+        'RQD' => 'RED VIP 120GB Unlimited',
+        '3L2' => '500 mb Data Price plan',
+        '3L3' => '1GB Data Price plan',
+        '3L4' => '2GB Data Price plan',
+        '3L5' => '3GB Data Price plan',
+        '3L6' => '5GB Data Price plan',
+        '3L7' => '10GB Data Price plan',
+        '3L8' => '20GB Data Price plan',
+        '3L9' => '30GB Data Price plan',
+        '3LA' => '50GB Data Price plan',
+        '5UH' => '100GB Home Internet L TopUp',
+        '5UI' => '250GB Home Internet L TopUp',
+        '5UJ' => '500GB Home Internet L TopUp',
+        '5UK' => '1TB Home Internet L TopUp',
+        'GHM' => 'Home Internet 10Mbps TopUp',
+        'GHN' => 'Home Internet 20Mbps TopUp',
+        'GHP' => 'Home Internet 30Mbps TopUp',
+        '3O2' => '500 mb Data Price plan Top up',
+        '3O3' => '1GB Data Price plan Top up',
+        '3O4' => '2GB Data Price plan Top up',
+        '3O5' => '3GB Data Price plan Top up',
+        '3O6' => '5GB Data Price plan Top up',
+        '3O7' => '10GB Data Price plan Top up',
+        '3O8' => '20GB Data Price plan Top up',
+        '3O9' => '30GB Data Price plan Top up',
+        '3OA' => '50GB Data Price plan Top up',
+        '5GL' => 'Home Internet 5G 25Mbps-Contract',
+        '5GM' => 'Home Internet 5G 50Mbps-Contract',
+        '5GN' => 'Home Internet 5G 100Mbps-Contract',
+        '5GQ' => 'Home Internet 5G Best Effort-Contract',
+        '5UL' => 'Home Internet 5G 25Mbps-Top Up',
+        '5UM' => 'Home Internet 5G 50Mbps-Top Up',
+        '5UN' => 'Home Internet 5G 100Mbps-Top Up',
+        '5UQ' => 'Home Internet 5G Best Effort-Top Up',
+    ];
+
+    if (array_key_exists($value, $titles)) {
+        return $titles[$value]; // return the value associated with the key
+    } else {
+        return 'Not found'; // return a default value if the key isn't found
+    }
+}
+
